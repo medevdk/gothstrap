@@ -1,0 +1,11 @@
+tmp/
+backups/
+*.db
+*.exe
+bin/
+node_modules/
+.env
+static/js/htmx.min.js
+static/js/alpine.min.js
+static/css/output.css
+*_templ.go

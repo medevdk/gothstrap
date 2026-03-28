@@ -1,0 +1,25 @@
+package handlers
+
+import (
+	"net/http"
+
+	"{{.ModulePath}}/internal/ui/templates/components"
+	"{{.ModulePath}}/internal/ui/templates/pages"
+	"{{.ModulePath}}/internal/ui/templates"
+)
+
+func Index(w http.ResponseWriter, r *http.Request) {
+	templates.Base("GoTH", components.Navbar()).Render(r.Context(), w)
+	// Render page inside base would normally use layout nesting;
+	// for the skeleton we render them sequentially so it compiles without extra wiring.
+	pages.Index().Render(r.Context(), w)
+}
+
+func Ping(w http.ResponseWriter, r *http.Request) {
+	pages.PingFragment().Render(r.Context(), w)
+}
+
+// Health is polled by the dev hot-reload script in base.templ.
+func Health(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+}

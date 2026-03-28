@@ -1,0 +1,45 @@
+-- .nvim.lua — project-local Neovim configuration for {{.ProjectName}}
+-- Neovim loads this automatically when you open the project directory,
+-- provided you have `vim.o.exrc = true` in your init.lua (or you approve
+-- it once via :trust when prompted).
+
+-- ── GoTH dev bindings ────────────────────────────────────────────────────────
+local ok, goth = pcall(require, "goth")
+if not ok then
+  -- Fall back to loading directly from .nvim/ if not on the runtimepath
+  local script_dir = vim.fn.fnamemodify(vim.fn.expand("<sfile>"), ":h")
+  local path = script_dir .. "/.nvim/goth.lua"
+  local chunk, err = loadfile(path)
+  if chunk then
+    goth = chunk()
+  else
+    vim.notify("gothstrap: could not load .nvim/goth.lua — " .. (err or ""), vim.log.levels.WARN)
+    goth = nil
+  end
+end
+
+if goth and goth.setup then
+  goth.setup()
+  vim.notify("GoTH bindings loaded (<leader>tg/tc/gr/gs/gd/gl/sq/du)", vim.log.levels.INFO)
+end
+
+-- ── Project-local settings ───────────────────────────────────────────────────
+-- Treat .templ files as html for syntax highlighting until a proper parser
+-- is available in your treesitter setup.
+vim.filetype.add({
+  extension = { templ = "html" },
+})
+
+-- Format .templ files with templ fmt on save
+vim.api.nvim_create_autocmd("BufWritePre", {
+  pattern = "*.templ",
+  callback = function()
+    local file = vim.fn.expand("%:p")
+    vim.fn.jobstart({ "templ", "fmt", file }, {
+      on_exit = function(_, code)
+        if code == 0 then vim.cmd("checktime") end
+      end,
+    })
+  end,
+  desc = "GoTH: run templ fmt on save",
+})

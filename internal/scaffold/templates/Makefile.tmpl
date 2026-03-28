@@ -1,0 +1,124 @@
+SHELL := /bin/zsh
+BINARY_NAME := {{.ProjectName}}
+HTMX_VER   := 2.0.4
+ALPINE_VER  := 3.14.8
+HTMX_URL   := https://cdn.jsdelivr.net/npm/htmx.org@$(HTMX_VER)/dist/htmx.min.js
+ALPINE_URL  := https://cdn.jsdelivr.net/npm/alpinejs@$(ALPINE_VER)/dist/cdn.min.js
+
+GIT_HASH  := $(shell git rev-parse --short HEAD 2>/dev/null || echo "no-git")
+DATE      := $(shell date +%Y-%m-%d_%H:%M:%S)
+LDFLAGS   := -ldflags "-s -w -X 'main.Version=$(GIT_HASH)' -X 'main.BuildTime=$(DATE)'"
+
+.PHONY: setup dev build clean backup restore help .check-tools
+
+# Helper: fail fast if a required tool is missing
+CHECK_COMMAND = @command -v $(1) >/dev/null 2>&1 || { echo "\033[0;31mError: $(1) is not installed.\033[0m"; exit 1; }
+
+.check-tools:
+	$(call CHECK_COMMAND,go)
+	$(call CHECK_COMMAND,templ)
+	$(call CHECK_COMMAND,npx)
+	$(call CHECK_COMMAND,air)
+
+## setup: download JS assets, install tools, and do an initial build
+setup:
+	@echo "→ Installing templ…"
+	go install github.com/a-h/templ/cmd/templ@latest
+	@echo "→ Installing air…"
+	go install github.com/air-verse/air@latest
+	@echo "→ Installing Tailwind CSS v4…"
+	npm install -D @tailwindcss/cli
+	@echo "→ Downloading HTMX $(HTMX_VER)…"
+	mkdir -p static/js
+	curl -sL $(HTMX_URL) -o static/js/htmx.min.js
+	@echo "→ Downloading Alpine $(ALPINE_VER)…"
+	curl -sL $(ALPINE_URL) -o static/js/alpine.min.js
+	@echo "→ Initial templ + CSS build…"
+	templ generate
+	npx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css
+	go mod tidy
+	@echo "✅ Setup complete. Run: make dev"
+
+## dev: start hot-reload dev environment (air + tailwind watcher + templ watcher)
+dev: .check-tools
+	@mkdir -p tmp
+	@echo "Clearing port $$(grep PORT .env | cut -d= -f2 | tr -d ' ')…"
+	-@lsof -ti:$$(grep PORT .env | cut -d= -f2 | tr -d ' ') | xargs kill -9 2>/dev/null || true
+	@echo "Starting development mode…"
+	@APP_ENV=dev templ generate --watch & \
+	APP_ENV=dev npx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --watch & \
+	APP_ENV=dev air; \
+	kill %1 %2 2>/dev/null || true
+
+## build: compile release binary with git-dirty check
+build: .check-tools
+	@mkdir -p tmp
+	@if [ -n "$$(git status --porcelain)" ]; then \
+		echo "WARNING: There are uncommitted changes"; \
+		read "ans?Continue anyway? [y/N]: "; \
+		if [[ "$$ans" != "y" ]]; then \
+			echo "Build aborted."; \
+			exit 1; \
+		fi; \
+	fi
+	@echo "Generating templ files…"
+	@templ generate
+	@echo "Building Tailwind CSS…"
+	@npx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --minify
+	@echo "Compiling Go binary…"
+	@go build $(LDFLAGS) -o $(BINARY_NAME) ./cmd/server
+	@echo "\033[0;32mBuild complete: ./$(BINARY_NAME)\033[0m"
+
+## clean: remove temp files and generated Go code
+clean:
+	@echo "Cleaning up…"
+	rm -rf tmp/
+	rm -f $(BINARY_NAME)
+	rm -f static/css/output.css
+	find . -name "*_templ.go" -delete
+	@echo "Cleaned."
+
+## backup: create a timestamped backup of the database
+backup:
+	@mkdir -p backups
+	$(eval TIMESTAMP := $(shell date +%Y-%m-%d_%H-%M-%S))
+	cp internal/data/database.db backups/backup_$(TIMESTAMP).db
+	@echo "Backup created: backups/backup_$(TIMESTAMP).db"
+
+## restore: interactively select and restore a database backup
+restore:
+	@echo "--- Database Restore Utility ---"
+	@zsh -c ' \
+		cd backups 2>/dev/null || { echo "No backups folder found."; exit 1; }; \
+		files=(*.db(N)); \
+		if [[ $${#files} -eq 0 ]]; then \
+			echo "No backup files found."; \
+			exit 1; \
+		fi; \
+		echo "Select a backup to restore:"; \
+		select opt in $${files[@]} "CANCEL"; do \
+			if [[ $$opt == "CANCEL" ]]; then \
+				echo "Aborted."; \
+				break; \
+			elif [[ -n $$opt ]]; then \
+				echo "Selected: $$opt"; \
+				read "confirm?Overwrite database.db? [y/N]: "; \
+				if [[ $$confirm == [yY] ]]; then \
+					cd ..; \
+					[[ -f internal/data/database.db ]] && cp internal/data/database.db internal/data/database.db.pre-restore; \
+					cp "backups/$$opt" internal/data/database.db; \
+					echo "Restore successful."; \
+				else \
+					echo "Cancelled."; \
+				fi; \
+				break; \
+			else \
+				echo "Invalid choice."; \
+			fi; \
+		done'
+
+## help: display this help message
+help:
+	@echo "Usage: make [target]"
+	@echo ""
+	@grep -E '^##' $(MAKEFILE_LIST) | sed -e 's/## //g' | column -t -s ':'

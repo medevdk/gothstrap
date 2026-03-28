@@ -1,0 +1,23 @@
+package components
+
+templ Navbar() {
+	<nav x-data="{ open: false }" class="bg-white dark:bg-gray-950 border-b border-gray-200 dark:border-gray-800">
+		<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+			<div class="flex justify-between h-16 items-center">
+				<div class="flex items-center gap-2">
+					<div class="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold">G</div>
+					<span class="text-xl font-bold">GoTH</span>
+				</div>
+				<div class="hidden md:flex items-center gap-6">
+					<a href="/" class="text-sm font-medium hover:text-indigo-600">Home</a>
+					<button
+						@click="$dispatch('show-toast', { value: 'Database Syncing...' })"
+						class="bg-gray-100 dark:bg-gray-800 px-3 py-1 rounded-md text-xs"
+					>
+						Sync
+					</button>
+				</div>
+			</div>
+		</div>
+	</nav>
+}

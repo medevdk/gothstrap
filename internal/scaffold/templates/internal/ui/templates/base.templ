@@ -1,0 +1,56 @@
+package templates
+
+import "os"
+
+templ Base(title string, header templ.Component) {
+	<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="UTF-8"/>
+			<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1"/>
+			<title>{ title }</title>
+			<link rel="stylesheet" href="/static/css/output.css"/>
+			<script defer src="/static/js/htmx.min.js"></script>
+			<script defer src="/static/js/alpine.min.js"></script>
+			<script>
+				document.addEventListener("DOMContentLoaded", () => {
+					document.body.addEventListener("htmx:afterSettle", e =>
+						window.Alpine && window.Alpine.initTree(e.detail.target)
+					);
+				});
+			</script>
+		</head>
+		<body id="page" class="bg-white dark:bg-gray-950 text-gray-900 dark:text-gray-100">
+			<div id="main-header">@header</div>
+			<main id="content-wrapper">{ children... }</main>
+			<div id="modal-container"></div>
+
+			<!-- Alpine toast -->
+			<div
+				x-data="{ show: false, msg: '' }"
+				x-on:show-toast.window="msg = $event.detail.value; show = true; setTimeout(()=>show=false, 3000)"
+				x-show="show"
+				x-cloak
+				class="fixed bottom-10 left-1/2 -translate-x-1/2 z-[200] bg-gray-900 text-white px-6 py-3 rounded-full shadow-2xl"
+			>
+				<span x-text="msg"></span>
+			</div>
+
+			<!-- Dev hot-reload: polls /health and reloads when server comes back up -->
+			if os.Getenv("APP_ENV") == "dev" {
+				<script>
+					let wasDown = false;
+					setInterval(async () => {
+						try {
+							const r = await fetch("/health");
+							if (r.ok && wasDown) window.location.reload();
+							wasDown = false;
+						} catch {
+							wasDown = true;
+						}
+					}, 1000);
+				</script>
+			}
+		</body>
+	</html>
+}

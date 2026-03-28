@@ -1,0 +1,48 @@
+package main
+
+import (
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+
+	"github.com/joho/godotenv"
+	"{{.ModulePath}}/internal/data"
+	"{{.ModulePath}}/internal/handlers"
+)
+
+// Populated at build time via -ldflags in the Makefile.
+var (
+	Version   = "dev"
+	BuildTime = "unknown"
+)
+
+func main() {
+	// Load .env (silently ignored in production where real env vars are set)
+	_ = godotenv.Load()
+
+	if err := data.Open(); err != nil {
+		log.Fatalf("database: %v", err)
+	}
+	defer data.DB.Close()
+
+	mux := http.NewServeMux()
+
+	// Static assets
+	mux.Handle(GET "/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
+
+	// Routes
+	mux.HandleFunc("GET /", handlers.Index)
+	mux.HandleFunc("GET /ping", handlers.Ping)
+	mux.HandleFunc("GET /health", handlers.Health)
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "3060"
+	}
+
+	addr := ":" + port
+	fmt.Printf("🚀  {{.ProjectName}}  %s (%s)\n", Version, BuildTime)
+	fmt.Printf("    http://localhost%s  APP_ENV=%s\n", addr, os.Getenv("APP_ENV"))
+	log.Fatal(http.ListenAndServe(addr, mux))
+}
