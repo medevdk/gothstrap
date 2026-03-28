@@ -44,7 +44,6 @@ my-app/
 │   ├── css/input.css               # Tailwind source
 │   └── js/                         # HTMX downloaded here by make setup
 ├── go.mod
-├── tailwind.config.js
 ├── Makefile
 ├── .gitignore
 ├── .env.example
