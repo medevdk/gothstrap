@@ -5,13 +5,13 @@
 ## Install
 
 ```bash
-go install github.com/yourusername/gothstrap@latest
+go install github.com/medevdk/gothstrap@latest
 ```
 
 Or build from source:
 
 ```bash
-git clone https://github.com/yourusername/gothstrap
+git clone https://github.com/medevdk/gothstrap
 cd gothstrap
 go build -o gothstrap .
 ```
@@ -24,11 +24,11 @@ gothstrap
 
 You'll be prompted for:
 
-| Prompt | Example |
-|--------|---------|
-| Project name | `my-app` |
-| Go module path | `github.com/you/my-app` |
-| Output directory | `./my-app` |
+| Prompt           | Example                 |
+| ---------------- | ----------------------- |
+| Project name     | `my-app`                |
+| Go module path   | `github.com/you/my-app` |
+| Output directory | `./my-app`              |
 
 ## What gets generated
 
@@ -56,11 +56,11 @@ my-app/
 Drop any file under `internal/scaffold/templates/`. Files ending in `.tmpl`
 are processed as Go `text/template` with the following variables available:
 
-| Variable | Example |
-|----------|---------|
-| `{{.ProjectName}}` | `my-app` |
-| `{{.ModulePath}}` | `github.com/you/my-app` |
-| `{{.OutputDir}}` | `./my-app` |
+| Variable           | Example                 |
+| ------------------ | ----------------------- |
+| `{{.ProjectName}}` | `my-app`                |
+| `{{.ModulePath}}`  | `github.com/you/my-app` |
+| `{{.OutputDir}}`   | `./my-app`              |
 
 All other files are copied verbatim — including `.templ` files, which use
 their own `{ }` syntax that would clash with Go's template engine.
