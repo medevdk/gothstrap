@@ -5,11 +5,15 @@ ALPINE_VER  := 3.14.8
 HTMX_URL   := https://cdn.jsdelivr.net/npm/htmx.org@$(HTMX_VER)/dist/htmx.min.js
 ALPINE_URL  := https://cdn.jsdelivr.net/npm/alpinejs@$(ALPINE_VER)/dist/cdn.min.js
 
+DB_PATH    := $(or $(shell grep -s DB_PATH .env | cut -d= -f2 | tr -d ' '),./internal/data/database.db)
+
 GIT_HASH  := $(shell git rev-parse --short HEAD 2>/dev/null || echo "no-git")
 DATE      := $(shell date +%Y-%m-%d_%H:%M:%S)
 LDFLAGS   := -ldflags "-s -w -X 'main.Version=$(GIT_HASH)' -X 'main.BuildTime=$(DATE)'"
 
-.PHONY: setup dev build clean backup restore help .check-tools
+.PHONY: setup dev build clean backup restore db-optimize db-shell help .check-tools
+# ── Uncomment for remote deploy ───────────────────────────────────────────────
+# .PHONY: build-arm deploy logs status clear-logs db-push db-pull db-shell-remote bench
 
 # Helper: fail fast if a required tool is missing
 CHECK_COMMAND = @command -v $(1) >/dev/null 2>&1 || { echo "\033[0;31mError: $(1) is not installed.\033[0m"; exit 1; }
@@ -19,6 +23,8 @@ CHECK_COMMAND = @command -v $(1) >/dev/null 2>&1 || { echo "\033[0;31mError: $(1
 	$(call CHECK_COMMAND,templ)
 	$(call CHECK_COMMAND,npx)
 	$(call CHECK_COMMAND,air)
+
+# ── Local development ─────────────────────────────────────────────────────────
 
 ## setup: download JS assets, install tools, and do an initial build
 setup:
@@ -42,8 +48,10 @@ setup:
 ## dev: start hot-reload dev environment (air + tailwind watcher + templ watcher)
 dev: .check-tools
 	@mkdir -p tmp
-	@echo "Clearing port $$(grep PORT .env | cut -d= -f2 | tr -d ' ')…"
-	-@lsof -ti:$$(grep PORT .env | cut -d= -f2 | tr -d ' ') | xargs kill -9 2>/dev/null || true
+	@if [ -f .env ]; then \
+		echo "Clearing port $$(grep PORT .env | cut -d= -f2 | tr -d ' ')…"; \
+		lsof -ti:$$(grep PORT .env | cut -d= -f2 | tr -d ' ') | xargs kill -9 2>/dev/null || true; \
+	fi
 	@echo "Starting development mode…"
 	@APP_ENV=dev templ generate --watch & \
 	APP_ENV=dev npx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --watch & \
@@ -78,11 +86,13 @@ clean:
 	find . -name "*_templ.go" -delete
 	@echo "Cleaned."
 
+# ── Database ──────────────────────────────────────────────────────────────────
+
 ## backup: create a timestamped backup of the database
 backup:
 	@mkdir -p backups
 	$(eval TIMESTAMP := $(shell date +%Y-%m-%d_%H-%M-%S))
-	cp internal/data/database.db backups/backup_$(TIMESTAMP).db
+	cp $(DB_PATH) backups/backup_$(TIMESTAMP).db
 	@echo "Backup created: backups/backup_$(TIMESTAMP).db"
 
 ## restore: interactively select and restore a database backup
@@ -102,11 +112,11 @@ restore:
 				break; \
 			elif [[ -n $$opt ]]; then \
 				echo "Selected: $$opt"; \
-				read "confirm?Overwrite database.db? [y/N]: "; \
+				read "confirm?Overwrite database? [y/N]: "; \
 				if [[ $$confirm == [yY] ]]; then \
 					cd ..; \
-					[[ -f internal/data/database.db ]] && cp internal/data/database.db internal/data/database.db.pre-restore; \
-					cp "backups/$$opt" internal/data/database.db; \
+					[[ -f $(DB_PATH) ]] && cp $(DB_PATH) $(DB_PATH).pre-restore; \
+					cp "backups/$$opt" $(DB_PATH); \
 					echo "Restore successful."; \
 				else \
 					echo "Cancelled."; \
@@ -116,6 +126,86 @@ restore:
 				echo "Invalid choice."; \
 			fi; \
 		done'
+
+## db-optimize: vacuum and analyze the SQLite database
+db-optimize:
+	@echo "Optimizing database (VACUUM & ANALYZE)…"
+	@sqlite3 $(DB_PATH) 'VACUUM; ANALYZE;'
+	@echo "\033[0;32mOptimization complete!\033[0m"
+	@ls -lh $(DB_PATH) | awk '{print "Size: " $$5}'
+
+## db-shell: open a SQLite shell with pretty-printing
+db-shell:
+	sqlite3 -column -header $(DB_PATH)
+
+# ── Remote deploy (Pi / VPS) ──────────────────────────────────────────────────
+# To enable: fill in the variables below and uncomment the targets.
+#
+# REMOTE_USER := pi
+# REMOTE_HOST := raspberrypi.local
+# REMOTE_DIR  := $(shell ssh $(REMOTE_USER)@$(REMOTE_HOST) "echo \$$HOME")/apps/{{.ProjectName}}
+# SQLITE_RSYNC := /opt/homebrew/bin/sqlite3_rsync   # brew install sqlite3-rsync
+#
+# ## build-arm: cross-compile for linux/arm64
+# build-arm: .check-tools
+# 	@$(MAKE) _git-check
+# 	@echo "Generating templ files…"
+# 	@templ generate
+# 	@echo "Building Tailwind CSS…"
+# 	@npx @tailwindcss/cli -i ./static/css/input.css -o ./static/css/output.css --minify
+# 	@echo "Compiling Go binary for linux/arm64…"
+# 	@GOOS=linux GOARCH=arm64 go build $(LDFLAGS) -o $(BINARY_NAME) ./cmd/server
+# 	@echo "\033[0;32mBuild complete: ./$(BINARY_NAME)\033[0m"
+#
+# ## deploy: build for remote and rsync binary to production
+# deploy: build-arm
+# 	@echo "Stopping remote service…"
+# 	-@ssh $(REMOTE_USER)@$(REMOTE_HOST) "sudo systemctl stop $(BINARY_NAME) 2>/dev/null || true"
+# 	@echo "Deploying $(BINARY_NAME)…"
+# 	rsync -avz ./$(BINARY_NAME) $(REMOTE_USER)@$(REMOTE_HOST):$(REMOTE_DIR)/
+# 	@echo "Restarting service…"
+# 	@ssh -t $(REMOTE_USER)@$(REMOTE_HOST) "chmod +x $(REMOTE_DIR)/$(BINARY_NAME) && sudo systemctl start $(BINARY_NAME)"
+# 	@echo "\033[0;32mDone: $(BINARY_NAME) is live.\033[0m"
+#
+# ## logs: tail the remote app log
+# logs:
+# 	ssh $(REMOTE_USER)@$(REMOTE_HOST) "tail -f $(REMOTE_DIR)/clog.log"
+#
+# ## status: check service, DB size, and disk space on remote
+# status:
+# 	@echo "--- Remote Status ---"
+# 	@ssh $(REMOTE_USER)@$(REMOTE_HOST) "systemctl is-active $(BINARY_NAME) --quiet && echo '\033[0;32m● Running\033[0m' || echo '\033[0;31m○ Stopped\033[0m'"
+# 	@ssh $(REMOTE_USER)@$(REMOTE_HOST) "ls -lh $(REMOTE_DIR)/$(BINARY_NAME) $(REMOTE_DIR)/clog.log 2>/dev/null | awk '{printf \"%-40s | Size: %s\n\", \$$9, \$$5}'"
+# 	@ssh $(REMOTE_USER)@$(REMOTE_HOST) "df -h / | awk 'NR==2 {print \"Disk: \" \$$3 \" / \" \$$2 \" (\" \$$5 \" full)\"}'"
+#
+# ## clear-logs: truncate the remote log file
+# clear-logs:
+# 	ssh $(REMOTE_USER)@$(REMOTE_HOST) "truncate -s 0 $(REMOTE_DIR)/clog.log"
+# 	@echo "Logs cleared."
+#
+# ## db-push: push local database to remote (destructive — confirms first)
+# db-push:
+# 	@ssh $(REMOTE_USER)@$(REMOTE_HOST) "cp $(REMOTE_DIR)/database.db $(REMOTE_DIR)/database.db.bak 2>/dev/null || true"
+# 	@read "ans?Overwrite production database? [y/N]: "; \
+# 	if [[ "$$ans" != "y" ]]; then echo "Aborted."; exit 1; fi
+# 	$(SQLITE_RSYNC) $(DB_PATH) $(REMOTE_USER)@$(REMOTE_HOST):$(REMOTE_DIR)/database.db
+#
+# ## db-pull: pull remote database to local (saved as database.debug.db)
+# db-pull:
+# 	@cp $(DB_PATH) $(DB_PATH).bak 2>/dev/null || true
+# 	$(SQLITE_RSYNC) $(REMOTE_USER)@$(REMOTE_HOST):$(REMOTE_DIR)/database.db ./internal/data/database.debug.db
+#
+# ## db-shell-remote: open SQLite shell on remote database
+# db-shell-remote:
+# 	ssh -t $(REMOTE_USER)@$(REMOTE_HOST) "sqlite3 -column -header $(REMOTE_DIR)/database.db"
+#
+# ## bench: run a quick disk write benchmark on the remote
+# bench:
+# 	@echo "Running disk write benchmark (500MB)…"
+# 	@ssh $(REMOTE_USER)@$(REMOTE_HOST) "dd if=/dev/zero of=$(REMOTE_DIR)/testfile bs=1M count=500 conv=fdatasync 2>&1 | grep 'copied'"
+# 	@ssh $(REMOTE_USER)@$(REMOTE_HOST) "rm $(REMOTE_DIR)/testfile"
+
+# ── Help ──────────────────────────────────────────────────────────────────────
 
 ## help: display this help message
 help:

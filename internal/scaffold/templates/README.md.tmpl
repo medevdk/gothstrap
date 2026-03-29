@@ -28,9 +28,35 @@ make dev     # starts Air live-reload dev server
 ## Development
 
 ```bash
-make dev      # live reload
-make build    # production binary → bin/
-make css      # rebuild Tailwind output
+make dev          # live reload (air + templ + tailwind watchers)
+make build        # production binary
+make clean        # remove temp files and generated Go code
+```
+
+## Database
+
+```bash
+make backup       # timestamped backup → backups/
+make restore      # interactively restore a backup
+make db-optimize  # VACUUM & ANALYZE
+make db-shell     # SQLite shell with pretty-printing
+```
+
+## Deploy
+
+The Makefile includes a commented-out remote deploy section (Pi / VPS) using
+`rsync` and `sqlite3_rsync` for safe database sync. Fill in `REMOTE_USER`,
+`REMOTE_HOST`, and `REMOTE_DIR` at the top of the Makefile and uncomment the
+targets to enable:
+
+```bash
+make deploy          # cross-compile + rsync binary to remote
+make logs            # tail remote log
+make status          # service status, DB size, disk usage
+make db-push         # push local DB to remote
+make db-pull         # pull remote DB locally (as database.debug.db)
+make db-shell-remote # SQLite shell on remote database
+make bench           # disk write benchmark on remote
 ```
 
 ## Stack

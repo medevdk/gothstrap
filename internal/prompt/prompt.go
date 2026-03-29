@@ -14,12 +14,14 @@ import (
 // ── Styles ────────────────────────────────────────────────────────────────────
 
 var (
-	titleStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#00ADD8")).Bold(true).MarginLeft(2)
-	labelStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("63")).Bold(true)
+	titleStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("47")).Bold(true).MarginLeft(2)
+	labelStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("47")).Bold(true)
+	activeStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("46"))
 	dimStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+	arrowStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("47"))
 	errorStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("203")).Bold(true).MarginLeft(2)
 	summaryBox  = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).Padding(1, 2).BorderForeground(lipgloss.Color("63"))
-	doneStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#04B575")).Bold(true)
+	doneStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("47")).Bold(true)
 	cancelStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("203")).Bold(true)
 )
 
@@ -43,10 +45,10 @@ const (
 )
 
 type model struct {
-	inputs    [fieldCount]textinput.Model
-	focus     int
-	status    status
-	validErr  string // inline validation message
+	inputs   [fieldCount]textinput.Model
+	focus    int
+	status   status
+	validErr string // inline validation message
 }
 
 func newModel() model {
@@ -128,26 +130,28 @@ func (m model) View() string {
 	}
 
 	labels := [fieldCount]string{"Project name", "Go module path", "Output directory"}
-	hints  := [fieldCount]string{"lowercase, hyphens OK", "used in go.mod", "created if absent"}
+	hints := [fieldCount]string{"lowercase, hyphens OK", "used in go.mod", "created if absent"}
 
 	var b strings.Builder
 	b.WriteString("\n")
 	b.WriteString(titleStyle.Render("GoTH Stack Scaffolder") + "\n\n")
 
 	for i, inp := range m.inputs {
-		bullet := "  "
-		if i == m.focus {
-			bullet = labelStyle.Render("▶ ")
-		}
 		label := dimStyle.Render(labels[i])
-		hint  := dimStyle.Render("(" + hints[i] + ")")
+		hint := dimStyle.Render("(" + hints[i] + ")")
 
 		if i == m.focus {
 			label = labelStyle.Render(labels[i])
+			hint = activeStyle.Render("(" + hints[i] + ")")
 		}
 
-		b.WriteString(fmt.Sprintf("%s%s %s\n", bullet, label, hint))
-		b.WriteString("  " + inp.View() + "\n\n")
+		b.WriteString(fmt.Sprintf(" %s %s\n", label, hint))
+
+		arrow := dimStyle.Render("  ➤ ")
+		if i == m.focus {
+			arrow = arrowStyle.Render(" ➤ ")
+		}
+		b.WriteString(arrow + inp.View() + "\n\n")
 	}
 
 	if m.validErr != "" {
@@ -159,7 +163,7 @@ func (m model) View() string {
 }
 
 func (m model) doneView() string {
-	name   := m.inputs[fieldProject].Value()
+	name := m.inputs[fieldProject].Value()
 	module := m.inputs[fieldModule].Value()
 	output := m.inputs[fieldOutput].Value()
 
