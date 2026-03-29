@@ -9,3 +9,20 @@ static/js/htmx.min.js
 static/js/alpine.min.js
 static/css/output.css
 *_templ.go
+.DS_Store
+
+# Go
+*.test
+*.out
+coverage.html
+
+# Air
+.air.toml.bak
+
+# OS
+Thumbs.db
+
+# Editor
+.vscode/
+*.swp
+*.swo

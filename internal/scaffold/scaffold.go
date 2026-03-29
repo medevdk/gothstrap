@@ -14,7 +14,7 @@ import (
 	"github.com/devdk/gothstrap/internal/config"
 )
 
-//go:embed templates
+//go:embed all:templates
 var templateFS embed.FS
 
 // Generate writes all embedded template files into cfg.OutputDir,
@@ -26,6 +26,9 @@ func Generate(cfg *config.Config) error {
 	if err := fs.WalkDir(templateFS, "templates", func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
+		}
+		if d.Name() == ".DS_Store" {
+			return nil
 		}
 
 		// Compute destination path by stripping the leading "templates/" prefix.
@@ -39,7 +42,7 @@ func Generate(cfg *config.Config) error {
 		dest := filepath.Join(cfg.OutputDir, destRel)
 
 		if d.IsDir() {
-			if mkErr := os.MkdirAll(dest, 0755); mkErr != nil {
+			if mkErr := os.MkdirAll(dest, 0o755); mkErr != nil {
 				return fmt.Errorf("mkdir %s: %w", dest, mkErr)
 			}
 			return nil
@@ -109,10 +112,10 @@ func writeFile(srcPath, destPath string, cfg *config.Config) error {
 }
 
 func writeBytesToDisk(path string, data []byte) error {
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	if err := os.WriteFile(path, data, 0644); err != nil {
+	if err := os.WriteFile(path, data, 0o644); err != nil {
 		return fmt.Errorf("write %s: %w", path, err)
 	}
 	fmt.Printf("  ✓  %s\n", path)

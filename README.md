@@ -5,13 +5,13 @@
 ## Install
 
 ```bash
-go install github.com/medevdk/gothstrap@latest
+go install github.com/devdk/gothstrap@latest
 ```
 
 Or build from source:
 
 ```bash
-git clone https://github.com/medevdk/gothstrap
+git clone https://github.com/devdk/gothstrap
 cd gothstrap
 go build -o gothstrap .
 ```
@@ -34,21 +34,57 @@ You'll be prompted for:
 
 ```
 my-app/
-├── cmd/server/main.go              # HTTP server entry point
-├── internal/
-│   ├── handlers/handlers.go        # Route handlers
-│   └── views/
-│       ├── layouts/base.templ      # Base HTML layout
-│       └── pages/index.templ       # Index page + HTMX fragment
-├── static/
-│   ├── css/input.css               # Tailwind source
-│   └── js/                         # HTMX downloaded here by make setup
-├── go.mod
-├── Makefile
+├── .air.toml                       # Air live-reload config
+├── .env.example                    # Environment variable template
 ├── .gitignore
-├── .env.example
+├── .nvim/                          # Neovim project config
+│   ├── database.lua
+│   └── goth.lua
+├── .nvim.lua                       # Neovim local config entry point
+├── cmd/
+│   └── server/
+│       ├── main.go                 # HTTP server entry point & graceful shutdown
+│       ├── routes.go               # Route definitions
+│       ├── static_dev.go           # Static file serving (development)
+│       └── static_prod.go          # Static file serving (production)
+├── internal/
+│   ├── data/
+│   │   └── db.go                   # SQLite connection & helpers
+│   ├── handlers/
+│   │   └── handlers.go             # Route handlers & error helpers
+│   ├── middleware/
+│   │   └── middleware.go           # Logging, recovery, common headers
+│   └── ui/
+│       └── templates/
+│           ├── base.templ          # Base HTML layout
+│           ├── components/
+│           │   ├── error.templ     # Error alert & full-page error
+│           │   └── navbar.templ    # Navigation bar
+│           └── pages/
+│               └── index.templ    # Index page + HTMX ping fragment
+├── static/
+│   ├── css/
+│   │   ├── input.css               # Tailwind source
+│   │   └── output.css              # Generated — do not edit
+│   └── js/
+│       ├── alpine.min.js           # Alpine.js
+│       └── htmx.min.js             # HTMX
+├── go.mod
+├── go.sum
+├── Makefile
+├── package.json                    # Tailwind CSS tooling
 └── README.md
 ```
+
+## Environment variables
+
+Copy `.env.example` to `.env` and adjust for your environment:
+
+| Variable  | Default (dev)                 | Description                                |
+| --------- | ----------------------------- | ------------------------------------------ |
+| `DB_PATH` | `./internal/data/database.db` | SQLite database path                       |
+| `PORT`    | `3060`                        | HTTP listen port                           |
+| `ENV`     | _(unset)_                     | Set to `production` to enable JSON logging |
 
 ## Adding your own templates
 

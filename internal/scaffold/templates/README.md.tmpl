@@ -1,0 +1,42 @@
+# {{.ProjectName}}
+
+> Built with the **GOTH** stack: **G**o · **templ** · **HTMX** · **Tailwind**
+
+## Setup
+
+Copy the example env file and fill in your values:
+
+```bash
+cp .env.example .env
+```
+
+Then run:
+
+```bash
+make setup   # downloads HTMX, Alpine, builds Tailwind
+make dev     # starts Air live-reload dev server
+```
+
+## Environment variables
+
+| Variable | Default (dev) | Description |
+|----------|--------------|-------------|
+| `DB_PATH` | `./internal/data/database.db` | SQLite database path |
+| `PORT` | `3060` | HTTP listen port |
+| `ENV` | *(unset)* | Set to `production` for JSON logging |
+
+## Development
+
+```bash
+make dev      # live reload
+make build    # production binary → bin/
+make css      # rebuild Tailwind output
+```
+
+## Stack
+
+- [Go](https://golang.org)
+- [templ](https://templ.guide)
+- [HTMX](https://htmx.org)
+- [Tailwind CSS](https://tailwindcss.com)
+- [SQLite](https://sqlite.org) via glebarez/go-sqlite3

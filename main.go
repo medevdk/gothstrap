@@ -12,7 +12,7 @@ import (
 const version = "0.1.0"
 
 func main() {
-	vLong  := flag.Bool("version", false, "Print version and exit")
+	vLong := flag.Bool("version", false, "Print version and exit")
 	vShort := flag.Bool("v", false, "Print version and exit")
 	flag.Parse()
 

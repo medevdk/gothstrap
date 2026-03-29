@@ -1,14 +1,19 @@
 package main
 
 import (
+  "context"
+  "os"
 	"fmt"
 	"log"
+	"log/slog"
 	"net/http"
-	"os"
+	"os/signal"
+	"path/filepath"
+	"syscall"
+	"time"
 
 	"github.com/joho/godotenv"
 	"{{.ModulePath}}/internal/data"
-	"{{.ModulePath}}/internal/handlers"
 )
 
 // Populated at build time via -ldflags in the Makefile.
@@ -18,31 +23,98 @@ var (
 )
 
 func main() {
+	// Logger
+ logFile:= initLogger()
+ if logFile != nil {  //development will write to clog.log
+     defer logFile.Close()
+   }
+
 	// Load .env (silently ignored in production where real env vars are set)
 	_ = godotenv.Load()
 
 	if err := data.Open(); err != nil {
-		log.Fatalf("database: %v", err)
+    slog.Error("critical database failure", "error", err)
+    os.Exit(1)
 	}
 	defer data.DB.Close()
-
-	mux := http.NewServeMux()
-
-	// Static assets
-	mux.Handle(GET "/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
-
-	// Routes
-	mux.HandleFunc("GET /", handlers.Index)
-	mux.HandleFunc("GET /ping", handlers.Ping)
-	mux.HandleFunc("GET /health", handlers.Health)
+  slog.Info("Database connection established", 
+    "version", Version,
+    "build_time", BuildTime,
+  )
 
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "3060"
 	}
 
-	addr := ":" + port
-	fmt.Printf("🚀  {{.ProjectName}}  %s (%s)\n", Version, BuildTime)
-	fmt.Printf("    http://localhost%s  APP_ENV=%s\n", addr, os.Getenv("APP_ENV"))
-	log.Fatal(http.ListenAndServe(addr, mux))
+  //Server with Gracefull shutdown. If Ctrl-C stops direct
+  //That can be an issue if writing to database at that time
+  quit:= make(chan os.Signal, 1)
+  signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+  srv:=&http.Server {
+      Addr: ":" + port,
+      Handler: routes(),
+      IdleTimeout: time.Minute,
+      ReadTimeout: 10 * time.Second,
+      WriteTimeout: 10 * time.Second,
+    }
+
+	fmt.Printf("🚀  {{.ProjectName}}  Version: %s (BuildTime: %s)\n", Version, BuildTime)
+	fmt.Printf("    http://localhost%s  APP_ENV=%s\n", srv.Addr, os.Getenv("APP_ENV"))
+
+    go func() {
+        if err:= srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+            slog.Error("server failed to start", "error", err)
+            os.Exit(1)
+          }
+      }()
+
+      <- quit //block until signal is received
+      slog.Info("shutting down the server")
+
+      ctx, cancel:= context.WithTimeout(context.Background(), 5 * time.Second)
+      defer cancel()
+
+      if err:= srv.Shutdown(ctx); err != nil {
+          slog.Error("server shutdown", "error", err)
+          os.Exit(1)
+        }
+      slog.Info("server stopped gracefully")
 }
+
+func initLogger() *os.File {
+  var handler slog.Handler
+
+  //check if production
+  if os.Getenv("ENV") == "production" {
+      handler = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions {
+          Level: slog.LevelInfo,
+        })
+    } else {
+    // Local development
+    logFile, err := os.OpenFile("clog.log", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0o644)
+    if err != nil {
+      // if we cannot log, we cannot start
+      log.Fatal(err)
+    }
+
+    handler = slog.NewTextHandler(logFile, &slog.HandlerOptions{
+      Level:     slog.LevelInfo,
+      AddSource: true, // This adds file and line number to each log entry
+      ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+        if a.Key == slog.SourceKey {
+          source := a.Value.Any().(*slog.Source)
+          // trim the filename:line in the log
+          source.File = filepath.Base(source.File)
+          source.Function = ""
+        }
+        return a
+      },
+    })
+    slog.SetDefault(slog.New(handler))
+    return logFile
+    }
+  slog.SetDefault(slog.New(handler))   //logger can now be used troughout the app without imports
+  return nil //no file to close in production. System logs to systemd
+  }

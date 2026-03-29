@@ -1,0 +1,33 @@
+package main
+
+import (
+	"net/http"
+
+	"{{.ModulePath}}/internal/handlers"
+	"{{.ModulePath}}/internal/middleware"
+)
+
+func routes() http.Handler {
+	mux := http.NewServeMux()
+
+	// Static assets
+	mux.Handle("GET /static/", http.StripPrefix("/static/", staticHandler()))
+
+	// Routes
+	mux.HandleFunc("GET /", handlers.Index)
+	mux.HandleFunc("GET /ping", handlers.Ping)
+	mux.HandleFunc("GET /health", handlers.Health)
+
+  //route to test error page -> Navigate to http://localhost:<port>/debug/panic
+  mux.HandleFunc("GET /debug/panic", func(w http.ResponseWriter, r *http.Request) {
+    panic("Testing the recobery middleware")
+    })
+
+	return middleware.Chain(
+      mux, 
+      middleware.RecoverPanic(handlers.ServerError),
+      middleware.LogRequest, 
+      middleware.CommonHeaders,
+      )
+}
+

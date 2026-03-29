@@ -2,10 +2,13 @@ package handlers
 
 import (
 	"net/http"
+  "log/slog"
 
 	"{{.ModulePath}}/internal/ui/templates/components"
 	"{{.ModulePath}}/internal/ui/templates/pages"
 	"{{.ModulePath}}/internal/ui/templates"
+
+	"github.com/a-h/templ"
 )
 
 func Index(w http.ResponseWriter, r *http.Request) {
@@ -23,3 +26,55 @@ func Ping(w http.ResponseWriter, r *http.Request) {
 func Health(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
+
+func ServerError(w http.ResponseWriter, r *http.Request, err error) {
+	slog.Error("server error",
+		"error", err.Error(),
+		"method", r.Method,
+		"uri", r.URL.RequestURI(),
+	)
+
+	w.WriteHeader(http.StatusInternalServerError)
+
+	if r.Header.Get("HX-Request") != "" {
+		// Just the small alert for HTMX partials
+		components.ErrorAlert("A server error occurred.").Render(r.Context(), w)
+		return
+	}
+
+	// Full page for standard loads
+	content := components.ErrorPage(500, "We encountered an unexpected error.")
+	ctx := templ.WithChildren(r.Context(), content)
+
+	templates.Base("GoTH", components.Navbar()).Render(ctx, w)
+}
+
+func ClientError(w http.ResponseWriter, r *http.Request, status int) {
+	slog.Warn("client error",
+		"status", status,
+		"method", r.Method,
+		"uri", r.URL.RequestURI(),
+	)
+
+	w.WriteHeader(status)
+
+	msg := http.StatusText(status)
+	if r.Header.Get("HX-Request") != "" {
+		components.ErrorAlert(msg).Render(r.Context(), w)
+		return
+	}
+
+	displayMsg := "The page you are looking for does not exist or has moved"
+	if status == http.StatusForbidden {
+		displayMsg = " You do not have permission to access this resource"
+	}
+	content := components.ErrorPage(status, displayMsg)
+	ctx := templ.WithChildren(r.Context(), content)
+
+	templates.Base("GoTH", components.Navbar()).Render(ctx, w)
+}
+
+func NotFound(w http.ResponseWriter, r *http.Request) {
+	ClientError(w, r, http.StatusNotFound)
+}
+
