@@ -57,7 +57,7 @@ func newModel() model {
 	placeholders := [fieldCount]string{
 		"my-app",
 		"github.com/you/my-app",
-		"./my-app",
+		"../my-app",
 	}
 
 	for i := range m.inputs {
@@ -100,7 +100,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.inputs[fieldModule].SetValue("github.com/you/" + name)
 				}
 				if m.inputs[fieldOutput].Value() == "" {
-					m.inputs[fieldOutput].SetValue(filepath.Join(".", name))
+					m.inputs[fieldOutput].SetValue(filepath.Join("..", name))
 				}
 			}
 
