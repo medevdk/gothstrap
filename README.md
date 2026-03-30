@@ -83,7 +83,7 @@ Copy `.env.example` to `.env` and adjust for your environment:
 | Variable  | Default (dev)                 | Description                                |
 | --------- | ----------------------------- | ------------------------------------------ |
 | `DB_PATH` | `./internal/data/database.db` | SQLite database path                       |
-| `PORT`    | `3060`                        | HTTP listen port                           |
+| `PORT`    | `3090`                        | HTTP listen port                           |
 | `ENV`     | _(unset)_                     | Set to `production` to enable JSON logging |
 
 ## Adding your own templates
