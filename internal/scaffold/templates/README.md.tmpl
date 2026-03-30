@@ -2,61 +2,69 @@
 
 > Built with the **GOTH** stack: **G**o · **templ** · **HTMX** · **Tailwind**
 
-## Setup
-
-Copy the example env file and fill in your values:
+## Quick start
 
 ```bash
-cp .env.example .env
-```
-
-Then run:
-
-```bash
-make setup   # downloads HTMX, Alpine, builds Tailwind
-make dev     # starts Air live-reload dev server
+cp .env.example .env   # fill in your values
+make setup             # initial build, install tools, download JS assets
+make dev               # start live-reload dev server
 ```
 
 ## Environment variables
 
-| Variable | Default (dev) | Description |
-|----------|--------------|-------------|
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `3090` | HTTP listen port |
 | `DB_PATH` | `./internal/data/database.db` | SQLite database path |
-| `PORT` | `3060` | HTTP listen port |
-| `ENV` | *(unset)* | Set to `production` for JSON logging |
+| `APP_ENV` | *(unset)* | Set to `production` for production mode |
 
-## Development
+## Make targets
+
+### Development
 
 ```bash
-make dev          # live reload (air + templ + tailwind watchers)
-make build        # production binary
-make clean        # remove temp files and generated Go code
+make setup        # install templ, air, tailwind, download HTMX + Alpine
+make dev          # live reload (air + templ watcher + tailwind watcher)
+make build-mac    # compile production binary for macOS
+make build-pi     # cross-compile production binary for linux/arm64
+make clean        # remove temp files, binary, and generated templ code
 ```
 
-## Database
+### Database
 
 ```bash
 make backup       # timestamped backup → backups/
 make restore      # interactively restore a backup
-make db-optimize  # VACUUM & ANALYZE
-make db-shell     # SQLite shell with pretty-printing
+make db-optimize  # VACUUM & ANALYZE the local database
+make db-shell     # open SQLite shell with pretty-printing
 ```
 
-## Deploy
+### Pi / VPS deploy
 
-The Makefile includes a commented-out remote deploy section (Pi / VPS) using
-`rsync` and `sqlite3_rsync` for safe database sync. Fill in `REMOTE_USER`,
-`REMOTE_HOST`, and `REMOTE_DIR` at the top of the Makefile and uncomment the
-targets to enable:
+Pi deploy targets are provided by `makefiles/pi.mk`. To enable:
+
+1. Uncomment `include makefiles/pi.mk` in the `Makefile`
+2. Add the following to your `.env`:
 
 ```bash
-make deploy          # cross-compile + rsync binary to remote
-make logs            # tail remote log
-make status          # service status, DB size, disk usage
-make db-push         # push local DB to remote
-make db-pull         # pull remote DB locally (as database.debug.db)
-make db-shell-remote # SQLite shell on remote database
-make bench           # disk write benchmark on remote
+PI=pi             # SSH alias from ~/.ssh/config
+```
+
+Available targets:
+
+```bash
+make setup-pi          # prepare Pi directories and install sqlite3_rsync
+make setup-service     # install / update the systemd service on the Pi
+make deploy            # build for Pi and rsync binary to production
+make status            # service status, DB size, disk usage, recent logs
+make logs              # tail the remote app log in real-time
+make clear-logs        # truncate the remote log file
+make db-push           # push local database to Pi (confirms before overwrite)
+make db-pull           # pull Pi database locally (saved as *.debug.db)
+make db-optimize-remote # VACUUM & ANALYZE the Pi database
+make db-shell-remote   # open SQLite shell on the Pi database
+make bench             # 500MB sequential write benchmark on Pi NVMe
+make pi-reboot         # gracefully stop app, sync filesystem, reboot Pi
 ```
 
 ## Stack
@@ -64,5 +72,6 @@ make bench           # disk write benchmark on remote
 - [Go](https://golang.org)
 - [templ](https://templ.guide)
 - [HTMX](https://htmx.org)
-- [Tailwind CSS](https://tailwindcss.com)
-- [SQLite](https://sqlite.org) via glebarez/go-sqlite3
+- [Alpine.js](https://alpinejs.dev)
+- [Tailwind CSS v4](https://tailwindcss.com)
+- [SQLite](https://sqlite.org) via [glebarez/go-sqlite](https://github.com/glebarez/go-sqlite)
