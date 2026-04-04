@@ -9,7 +9,9 @@ SERVICE_NAME := $(BINARY_NAME).service
 DB_NAME := $(notdir $(DB_PATH))
 
 
-.PHONY: setup-pi setup-service deploy status logs clear-logs db-push db-pull db-optimize-remote db-shell-remote pi-reboot pi-ping pi-health bench
+.PHONY: setup-pi build-pi setup-service deploy status logs clear-logs db-push db-pull db-optimize-remote db-shell-remote pi-reboot pi-ping pi-health bench
+
+## ---: --- Pi/VPS targets (uncomment 'include ..' in Makefile) ---
 
 ## setup-pi: Prepare the Pi with app directories and sqlite3_rsync
 setup-pi:
@@ -26,6 +28,25 @@ setup-pi:
 		chmod +x $(PI_HOME)/.local/bin/sqlite3_rsync; \
 	}"
 	@echo "\033[0;32mPi is ready!\033[0m"
+
+## build-pi: Compile the binary for Raspberry Pi (linux/arm64)
+build-pi: .check-tools
+	@mkdir -p tmp
+	@if [ -n "$$(git status --porcelain)" ]; then \
+		echo "WARNING: There are uncommitted changes"; \
+		read "ans?Continue anyway? [y/N]: "; \
+		if [[ "$$ans" != "y" ]]; then \
+			echo "Build aborted."; \
+			exit 1; \
+		fi; \
+	fi
+	@echo "Generating Templ files..."
+	@templ generate
+	@echo "Building Tailwind CSS..."
+	@npx tailwindcss -i ./ui/css/input.css -o ./ui/css/output.css --minify
+	@echo "Compiling Go binary for linux/arm64..."
+	@GOOS=linux GOARCH=arm64 go build -tags prod $(LDFLAGS) -o $(BINARY_NAME)
+	@echo "\033[0;32mBuild complete: ./$(BINARY_NAME)\033[0m"
 
 ## setup-service: Install / update the systemd service on the Pi
 setup-service:

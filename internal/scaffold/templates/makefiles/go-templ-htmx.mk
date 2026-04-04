@@ -11,6 +11,8 @@ LDFLAGS  := -ldflags "-s -w -X 'main.Version=$(GIT_HASH)' -X 'main.BuildTime=$(D
 
 .PHONY: dev build-pi build-mac clean .check-tools
 
+## ---: --- Dev targets (local) ---
+
 # Helper to check if a command exists
 CHECK_COMMAND = @command -v $(1) >/dev/null 2>&1 || { echo "\033[0;31mError: $(1) is not installed.\033[0m"; exit 1; }
 
@@ -35,24 +37,6 @@ dev: .check-tools
 	APP_ENV=dev air; \
 	kill %1
 
-## build-pi: Compile the binary for Raspberry Pi (linux/arm64)
-build-pi: .check-tools
-	@mkdir -p tmp
-	@if [ -n "$$(git status --porcelain)" ]; then \
-		echo "WARNING: There are uncommitted changes"; \
-		read "ans?Continue anyway? [y/N]: "; \
-		if [[ "$$ans" != "y" ]]; then \
-			echo "Build aborted."; \
-			exit 1; \
-		fi; \
-	fi
-	@echo "Generating Templ files..."
-	@templ generate
-	@echo "Building Tailwind CSS..."
-	@npx tailwindcss -i ./ui/css/input.css -o ./ui/css/output.css --minify
-	@echo "Compiling Go binary for linux/arm64..."
-	@GOOS=linux GOARCH=arm64 go build -tags prod $(LDFLAGS) -o $(BINARY_NAME)
-	@echo "\033[0;32mBuild complete: ./$(BINARY_NAME)\033[0m"
 
 ## build-mac: Compile the binary for macOS
 build-mac: .check-tools

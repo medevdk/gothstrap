@@ -15,7 +15,7 @@ include makefiles/go-templ-htmx.mk
 #
 # include makefiles/pi.mk 
 
-.PHONY: setup backup restore db-optimize db-shell help
+.PHONY: setup backup restore db-optimize-local db-shell-local help
 
 HTMX_VER   := 2.0.4
 ALPINE_VER  := 3.14.8
@@ -23,6 +23,9 @@ HTMX_URL   := https://cdn.jsdelivr.net/npm/htmx.org@$(HTMX_VER)/dist/htmx.min.js
 ALPINE_URL  := https://cdn.jsdelivr.net/npm/alpinejs@$(ALPINE_VER)/dist/cdn.min.js
 
 DB_PATH := $(or $(shell grep -s DB_PATH .env | cut -d= -f2 | tr -d ' '),./internal/data/database.db)
+
+## ---: --- Generic targets (local)  ---
+
 
 # ── Setup ─────────────────────────────────────────────────────────────────────
 
@@ -88,25 +91,23 @@ restore:
 			fi; \
 		done'
 
-## db-optimize: vacuum and analyze the local SQLite database
-db-optimize:
+## db-optimize-local: vacuum and analyze the local SQLite database
+db-optimize-local:
 	@echo "Optimizing database (VACUUM & ANALYZE)…"
 	@sqlite3 $(DB_PATH) 'VACUUM; ANALYZE;'
 	@echo "\033[0;32mOptimization complete!\033[0m"
 	@ls -lh $(DB_PATH) | awk '{print "Size: " $$5}'
 
-## db-shell: open a local SQLite shell with pretty-printing
-db-shell:
+## db-shell-local: open a local SQLite shell with pretty-printing
+db-shell-local:
 	sqlite3 -column -header $(DB_PATH)
 
 # ── Help ──────────────────────────────────────────────────────────────────────
-
-## help: display all available targets
+## help:
 help:
 	@echo "\033[1mUsage:\033[0m make \033[36m[target]\033[0m"
 	@echo ""
-	@grep -E '^##' makefiles/go-templ-htmx.mk Makefile | \
-		grep -v '^.*:## help:' | \
-		sed -e 's/.*:## //g' | \
-		awk 'BEGIN {FS = ":"}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
 	@echo "\033[36mhelp\033[0m            display all available targets"
+	@grep -E '^##' Makefile makefiles/*.mk | grep -v '^[^:]*:## help' | \
+		sed -e 's/.*:## //g' | \
+		awk 'BEGIN {FS = ":"}; /^---/ {printf "\n"}; {printf "\033[36m%-15s\033[0m %s\n", $$1, $$2}'
